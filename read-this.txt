@@ -1,0 +1,39 @@
+
+// EXAMPLE REQUEST BODY ON CREATING A NEW SHOP
+
+{
+  "name": "Sample Shop name",
+  "email": "sampleshop@example.com",
+  "password": "samplepassword",
+
+  "avatar": "https://wallpapers.com/images/hd/the-punisher-logo-cool-picture-o5yc3v4pr5m5d5vx.jpg", (note:(this is for the image, should be an image url or a path from the users computer from when file uploaded))
+
+  "address": "123 Sample Street",
+  "phoneNumber": 1234567890,
+  "zipCode": 12345
+}
+
+
+// EXAMPLE REQUEST BODY ON CREATING A NEW PRODUCT
+
+{
+  "name": "Sample Product NAME",
+  "description": "This is a sample product description.",
+  "category": "sample category",
+  "tags": "sample, electronics",
+  "originalPrice": 100,
+  "discountPrice": 80,
+  "stock": 10,
+  "images": [
+    "https://www-konga-com-res.cloudinary.com/w_400,f_auto,fl_lossy,dpr_3.0,q_auto/media/catalog/product/V/D/67343_1663481920.jpg",
+    "https://www-konga-com-res.cloudinary.com/w_auto,f_auto,fl_lossy,dpr_auto,q_auto/media/catalog/product/L/Q/67343_1663479467.jpg"
+  ], - (note:(this is for the image, should be an image url or a path from the users computer from when file uploaded))
+  "shopId": "64dd27a4f9d9779838cd0511 (ID of the shop)",
+  "shop": {
+    "name": "Sample Shop",
+    "location": "123 Sample Street"
+  }
+}
+
+
+hvqy xmps jgkh miba
