@@ -92,7 +92,7 @@ router.post('/create-shop', catchAsyncErrors(async (req, res, next) => {
       expiresIn: '90d', // You can set the token expiration as needed
     });
 
-    const verificationLink = `https://villaja-backend-server.onrender.com/api/shop/verify-email/${newSeller._id}/${newSeller.emailVerificationCode}`;
+    const verificationLink = `https://villajabackendserver-48y0h87u.b4a.run/api/shop/verify-email/${newSeller._id}/${newSeller.emailVerificationCode}`;
 
     // Craft the welcome email for the shop
     const emailHTML = `
@@ -630,7 +630,7 @@ router.post('/forgot-password', catchAsyncErrors(async (req, res, next) => {
     await user.save();
 
     // Send a password reset email to the user
-    const resetPasswordLink = `https://villaja-backend-server.onrender.com/api/shop/reset-password/${resetToken}`;
+    const resetPasswordLink = `https://villajabackendserver-48y0h87u.b4a.run/api/shop/reset-password/${resetToken}`;
 
     const emailHTML = `
       <html>
@@ -724,7 +724,7 @@ router.get('/reset-password/:token', async (req, res, next) => {
     
       <center>
         <h2 style="margin-bottom: 20px; color: dodgerblue;">Reset Your <i>Villaja</i> Password</h2>
-        <form action="https://villaja-backend-server.onrender.com/api/shop/reset-password" method="post" style="max-width: 400px; margin: 0 auto;">
+        <form action="https://villajabackendserver-48y0h87u.b4a.run/api/shop/reset-password" method="post" style="max-width: 400px; margin: 0 auto;">
           <input type="hidden" name="token" value="${token}">
           <label for="newPassword" style="display: block; margin-bottom: 10px;">New Password:</label>
           <input type="password" name="newPassword" required style="padding: 10px; border-radius: 6px; margin-bottom: 20px; width: 100%; box-sizing: border-box;">
