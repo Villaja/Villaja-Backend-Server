@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-
+  pushNotificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpiry: Date, 
  createdAt:{

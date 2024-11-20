@@ -48,7 +48,7 @@ router.post(
           shippingAddress,
           user,
           totalPrice: items.reduce((total, item) => {
-            if (item.discountPrice != 0) {
+            if (item.discountPrice != 0 || item.discountPrice != null) {
               return total + item.discountPrice
             }
             return total + item.originalPrice
