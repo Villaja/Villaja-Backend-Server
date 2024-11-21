@@ -1,6 +1,16 @@
 const mongoose = require('mongoose');
 const app = require("../app");
 
+var DB_URL
+
+if (process.env.NODE_ENV !== "PRODUCTION") {
+     DB_URL = process.env.DB_URL_TEST
+}
+else
+{
+    DB_URL = process.env.DB_URL
+}
+
 const connectDatabase = async () => {
   try {
     const conn = await mongoose.connect(process.env.DB_URL, {
