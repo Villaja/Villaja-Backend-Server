@@ -28,4 +28,4 @@ const getToken = async (userId) => {
     return values ?? {};
 };
 
-export { app, saveToken, getToken };
+module.exports = { app, saveToken, getToken };
