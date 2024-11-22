@@ -127,6 +127,11 @@ router.put(
         return next(new ErrorHandler("Product not found", 404));
       }
 
+      // update product reviews
+      if (updateData.reviews && updateData.reviews.length > 0) {
+        product.reviews = [...updateData.reviews, ...product.reviews ];
+      }
+
       // Check if there are new colors with images to upload
       if (updateData.colorList && updateData.colorList.length > 0) {
         let newColorListData = [];

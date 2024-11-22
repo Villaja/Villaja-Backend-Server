@@ -50,6 +50,7 @@ router.post('/register', async (req, res, next) => {
       phoneNumber: phoneNumber,
       password: password,
       emailVerificationCode: crypto.randomBytes(3).toString('hex').toUpperCase(),
+      pushNotificationToken: pushNotificationToken,
     });
 
     // Generate a JWT token for the newly registered user
