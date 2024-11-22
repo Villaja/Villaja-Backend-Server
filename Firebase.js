@@ -1,5 +1,6 @@
-import { getDatabase, ref, set, get, child } from 'firebase/database';
-import { initializeApp } from 'firebase/app';
+const { getDatabase, ref, set, get, child } = require('firebase/database');
+const { initializeApp } = require('firebase/app');
+
 
 const firebaseConfig = {
     apiKey: "AIzaSyDUYJQLyFl8nNXV4iHOgWwm-BRhiRTcASs",
