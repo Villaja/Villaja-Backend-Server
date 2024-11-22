@@ -17,6 +17,10 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
+    orderApprovalStatus: {
+        type: String,
+        default: "Pending",
+    },
     status:{
         type: String,
         default: "Processing",

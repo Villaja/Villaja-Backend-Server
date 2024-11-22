@@ -6,8 +6,11 @@ const { isAuthenticated, isSeller, isAdmin } = require("../middleware/auth");
 const Order = require("../model/order");
 const Shop = require("../model/shop");
 const Product = require("../model/product");
+const nodemailer = require('nodemailer');
+const { getToken } = require('../Firebase');
+const { Expo } = require('expo-server-sdk');
 
-const nodemailer = require('nodemailer')
+const expo = new Expo();
 
 
 const transporter = nodemailer.createTransport({
@@ -659,6 +662,105 @@ router.get(
         success: true,
         order,
       });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+// Update order approval status
+router.put(
+  "/update-order-approval-status/:id",
+  isAuthenticated, // Ensure the user is authenticated
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { orderApprovalStatus } = req.body;
+
+      // Validate that orderApprovalStatus is a string
+      if (typeof orderApprovalStatus !== 'string') {
+        return next(new ErrorHandler("Invalid input: orderApprovalStatus must be a string.", 400));
+      }
+
+      const order = await Order.findById(req.params.id).populate('user');
+
+      if (!order) {
+        return next(new ErrorHandler("Order not found with this ID", 404));
+      }
+
+      // Optionally, check if the user updating the order is the one who placed it
+      if (order.user._id.toString() !== req.user._id.toString()) {
+        return next(new ErrorHandler("Unauthorized to update this order", 401));
+      }
+
+      order.orderApprovalStatus = orderApprovalStatus;
+      await order.save();
+
+      // Send email to admin, user, and all sellers if status is "Approved" or "Declined"
+      if (orderApprovalStatus === "Approved" || orderApprovalStatus === "Declined") {
+        const adminEmail = "villajamarketplace@gmail.com"; // Admin email
+        const userId = String(order.user._id);
+        const userEmail = order.user.email; // Assuming user email is stored in the order's user object
+        const subject = `Order ${orderApprovalStatus}`;
+        const sellerMessage = `The order with ID ${order._id} has been ${orderApprovalStatus.toLowerCase()} by ${order.user.fullName}.`;
+        const userMessage = `Your order with ID ${order._id} has been ${orderApprovalStatus.toLowerCase()}.`;
+        const adminMessage = `The order with ID ${order._id} has been ${orderApprovalStatus.toLowerCase()} by ${order.user.fullName}.`;
+
+        // Send email to admin
+        await sendMail({
+          to: adminEmail,
+          subject: subject,
+          text: adminMessage
+        });
+
+        // Send email to user
+        await sendMail({
+          to: userEmail,
+          subject: subject,
+          text: userMessage
+        });
+
+        // Send mobile app push notification
+        const { token } = await getToken(userId);
+        if (token) {
+          expo.sendPushNotificationsAsync([{
+            to: token,
+            title: `${orderApprovalStatus} Order`,
+            body: userMessage
+          }]);
+        }
+
+        // Iterate over each product in the cart
+        for (const item of order.cart) {
+          const product = await Product.findById(item._id).populate('shop');
+          if (product && product.shop && product.shop.email) {
+            // Send email to each seller
+            await sendMail({
+              to: product.shop.email,
+              subject: subject,
+              text: sellerMessage
+            });
+
+            // Send mobile app push notification
+            if (product && product.shop && product.shop._id) {
+              const sellerId = String(product.shop._id);
+              const { token } = await getToken(sellerId);
+              if (token) {
+                expo.sendPushNotificationsAsync([{
+                  to: token,
+                  title: `${orderApprovalStatus} Order`,
+                  body: sellerMessage
+                }]);
+              }
+            }
+          }
+        }
+
+        res.status(200).json({
+          success: true,
+          message: `Order approval status updated to ${orderApprovalStatus} successfully`,
+          order,
+        });
+      }
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
     }

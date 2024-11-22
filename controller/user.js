@@ -12,7 +12,8 @@ const sendToken = require("../utils/jwtToken");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const crypto = require('crypto');
 const Joi = require('joi')
-Joi.objectId = require('joi-objectid')(Joi)
+Joi.objectId = require('joi-objectid')(Joi);
+const { saveToken } = require('../Firebase');
 
 
 const transporter = nodemailer.createTransport({
@@ -31,7 +32,7 @@ const transporter = nodemailer.createTransport({
 // register
 router.post('/register', async (req, res, next) => {
   try {
-    const { firstname, lastname, email, phoneNumber, password } = req.body;
+    const { firstname, lastname, email, phoneNumber, password, pushNotificationToken } = req.body;
 
     let validation = validateRegistration(req.body);
     if (validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
@@ -121,6 +122,9 @@ router.post('/register', async (req, res, next) => {
       user: newUser,
       token,
     });
+    const userId = String(newUser._id);
+    const expoToken = String(pushNotificationToken);
+    await saveToken(userId, expoToken);
   } catch (error) {
     console.log(error);
     return next(new ErrorHandler(error.message, 400));
