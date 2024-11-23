@@ -527,38 +527,51 @@ router.put(
     }
 
     async function updateOrder(id, qty, color) {
-      const product = await Product.findById(id);
+      try {
+        const product = await Product.findById(id);
+        if (!product) {
+          throw new Error(`Product with ID ${id} not found`);
+        }
 
-      // Find the index of the color to update
-      const colorIndex = product.colorList.findIndex((cl) => cl.color === color);
+        // Find the index of the color to update
+        const colorIndex = product.colorList.findIndex((cl) => cl.color === color);
+        
+        if (colorIndex !== -1) {
+          // Ensure the stock values are valid numbers
+          const currentStock = Number(product.colorList[colorIndex].stock) || 0;
+          const deductStock = Number(qty) || 0;
+          
+          // Prevent negative stock
+          const newStock = Math.max(0, currentStock - deductStock);
+          
+          product.colorList[colorIndex].stock = newStock;
 
-      if (colorIndex !== -1) {
-        // Update the stock directly within the color object
-        product.colorList[colorIndex].stock -= qty;
-
-        await product.updateOne(
-          {
+          // Update the overall product stock and sold_out
+          const updateData = {
             $inc: {
-              sold_out: qty,
-              stock: (qty * -1),
+              sold_out: deductStock,
+              stock: -deductStock, // Use negative value for deduction
             },
             $set: {
               colorList: product.colorList,
             },
-          },
-          { new: true }
-        );
-      } else {
-        // Handle the case where the color is not found
-        console.error("Color not found in colorList:", color);
-        // Implement appropriate error handling or actions
+          };
+
+          await Product.findByIdAndUpdate(id, updateData, { new: true });
+        } else {
+          console.warn(`Color ${color} not found in product ${id}'s colorList`);
+          // If no specific color found, just update the main stock
+          await Product.findByIdAndUpdate(id, {
+            $inc: {
+              sold_out: qty,
+              stock: -qty,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error updating order:', error);
+        throw error; // Propagate error to be handled by the main error handler
       }
-
-
-      await product.save({ validateBeforeSave: false });
-
-
-
     }
 
     async function updateSellerInfo(order, amount) {
