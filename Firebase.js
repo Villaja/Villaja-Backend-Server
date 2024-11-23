@@ -1,5 +1,5 @@
-const { getDatabase, ref, set, get, child } = require('firebase/database');
-const { initializeApp } = require('firebase/app');
+import { getDatabase, ref, set, get, child } from 'firebase/database';
+import { initializeApp } from 'firebase/app';
 
 
 const firebaseConfig = {
@@ -28,4 +28,4 @@ const getToken = async (userId) => {
     return values ?? {};
 };
 
-module.exports = { app, saveToken, getToken };
+export { app, saveToken, getToken };
