@@ -1,6 +1,5 @@
-import { getDatabase, ref, set, get, child } from 'firebase/database';
-import { initializeApp } from 'firebase/app';
-
+const { getDatabase, ref, set, get, child } = require('firebase/database');
+const { initializeApp } = require('firebase/app');
 
 const firebaseConfig = {
     apiKey: "AIzaSyDUYJQLyFl8nNXV4iHOgWwm-BRhiRTcASs",
@@ -20,7 +19,7 @@ const dbRef = ref(db);
 const saveToken = async (userId, token) => {
     const values = (await get(child(dbRef, `userTokens/${userId}/`))).val() ?? {};
     const payload = {...values, token};
-    set(ref(db, `userTokens/${userId}/`), payload);
+    await set(ref(db, `userTokens/${userId}/`), payload);
 };
 
 const getToken = async (userId) => {
@@ -28,4 +27,4 @@ const getToken = async (userId) => {
     return values ?? {};
 };
 
-export { app, saveToken, getToken };
+module.exports = { app, saveToken, getToken };
