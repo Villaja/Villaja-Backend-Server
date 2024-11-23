@@ -33,23 +33,21 @@ router.post(
     try {
       const { cart, shippingAddress, user, totalPrice, paymentInfo } = req.body;
 
-      // group cart items by shopId
+      //   group cart items by shopId
       const shopItemsMap = new Map();
 
-      for (const item of cart) {
-        const product = await Product.findById(item.product);
-        if (!product) {
-          return next(new ErrorHandler(`Product not found with id ${item.product}`, 404));
-        }
-        const shopId = product.shopId;
+      // Process cart items to include approvalStatus
+      const processedCart = cart.map(item => ({
+        ...item,
+        approvalStatus: "Pending"
+      }));
+
+      for (const item of processedCart) {
+        const shopId = item.shopId;
         if (!shopItemsMap.has(shopId)) {
           shopItemsMap.set(shopId, []);
         }
-        shopItemsMap.get(shopId).push({
-          product: item.product,
-          quantity: item.quantity,
-          approvalStatus: "Pending"
-        });
+        shopItemsMap.get(shopId).push(item);
       }
 
       // create an order for each shop
@@ -67,9 +65,6 @@ router.post(
 
         // Get the shop owner's email
         const shop = await Shop.findById(shopId);
-        if (!shop) {
-          continue; // Skip if shop not found
-        }
 
         // Craft a confirmation email for the shop owner
         const shopEmailHTML = `
@@ -90,19 +85,11 @@ router.post(
                 Shipping Address: ${JSON.stringify(shippingAddress)}
                 </p>
                 <p>
-                Products Ordered:
-                ${items.map(async (item) => {
-                  const product = await Product.findById(item.product);
-                  return `
-                    <div>
-                      - ${product.name} (Quantity: ${item.quantity})
-                    </div>
-                  `;
-                }).join('')}
+                Product Color: ${JSON.stringify(order.cart[0].color)}
                 </p>
                 <p>
                   Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
-                </p>
+               </p>
                 <p>
                   Best regards,</br>
                   The Villaja Team
@@ -112,33 +99,155 @@ router.post(
           </html>
         `;
 
-        // Send email to shop owner
-        const mailOptions = {
-          from: 'villajamarketplace@gmail.com',
-          to: shop.email,
-          subject: 'New Order Received',
-          html: shopEmailHTML
+        // Send the confirmation email to the shop owner
+        const sendShopEmail = () => {
+          return new Promise((resolve, reject) => {
+            const mailOptions = {
+              from: 'villajamarketplace@gmail.com',
+              to: shop.email,
+              subject: 'New Order Received',
+              html: shopEmailHTML,
+            };
+
+            transporter.sendMail(mailOptions, (error, info) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve('Email sent');
+              }
+            });
+          });
         };
 
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            console.log('Error sending email:', error);
-          } else {
-            console.log('Email sent:', info.response);
-          }
-        });
-
-        // Send push notification to shop owner
-        const { token } = await getToken(shopId);
-        if (token) {
-          await expo.sendPushNotificationsAsync([
-            {
-              to: token,
-              title: 'New Order Received',
-              body: `You have received a new order worth ${totalPrice}`,
-            },
-          ]);
+        try {
+          await sendShopEmail();
+          console.log('Confirmation email sent to shop owner');
+        } catch (error) {
+          console.error('Email sending failed:', error);
         }
+      }
+
+      // Craft a confirmation email for the admin
+      const adminEmailHTML = `
+        <html>
+          <body>
+           <meta charset="UTF-8">
+            <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+              <h2>New Order</h2>
+              <p>
+                Hello Admin, ${user.firstname}! Just placed an order, track it in your dashboard.
+              </p>
+              <p>
+                Order ID: ${orders.map(order => order._id).join(', ')}
+              </p>
+              <p>
+                Total Price: ${totalPrice}
+              </p>
+              <p>
+                Shipping Address: ${JSON.stringify(shippingAddress)}
+              </p>
+              <p>
+              Product Color: ${JSON.stringify(orders[0]?.cart[0]?.color)}
+              </p>
+              <p>
+              Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+              </p>
+              <p>
+                Best regards,</br>
+                The Villaja Team
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Send the confirmation email to admin
+      const sendAdminEmail = () => {
+        return new Promise((resolve, reject) => {
+          const mailOptions = {
+            from: 'villajamarketplace@gmail.com',
+            to: 'villajamarketplace@gmail.com',
+            subject: 'Order Confirmation',
+            html: adminEmailHTML,
+          };
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve('Email sent');
+            }
+          });
+        });
+      };
+
+      try {
+        await sendAdminEmail();
+        console.log('Confirmation email sent to admin');
+      } catch (error) {
+        console.error('Email sending failed:', error);
+      }
+
+      // Craft a confirmation email for the user
+      const userEmailHTML = `
+        <html>
+          <body>
+           <meta charset="UTF-8">
+            <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+              <h2>Your Order Has Been Placed</h2>
+              <p>
+                Hello, ${user.firstname}! We're delighted to inform you that your order has been successfully placed and is now in motion! 🚀.
+                Continue shopping <a href="http://www.villaja.com">www.villaja.com</a>
+              </p>
+              <p>
+                Order ID: ${orders.map(order => order._id).join(', ')}
+              </p>
+              <p>
+                Total Price: ${totalPrice}
+              </p>
+              <p>
+              Shipping Address: ${JSON.stringify(shippingAddress)}
+              </p>
+              <p>
+              Product Color: ${JSON.stringify(orders[0]?.cart[0]?.color)}
+              </p>
+              <p>
+              Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+              </p>
+              <p>
+                Best regards,</br>
+                The Villaja Team
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Send the confirmation email to the user
+      const sendUserEmail = () => {
+        return new Promise((resolve, reject) => {
+          const mailOptions = {
+            from: 'villajamarketplace@gmail.com',
+            to: user.email,
+            subject: 'Order Confirmation',
+            html: userEmailHTML,
+          };
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve('Email sent');
+            }
+          });
+        });
+      };
+
+      try {
+        await sendUserEmail();
+        console.log('Confirmation email sent to user');
+      } catch (error) {
+        console.error('Email sending failed:', error);
       }
 
       res.status(201).json({
@@ -500,136 +609,50 @@ router.put(
         return next(new ErrorHandler("Order not found with this ID", 404));
       }
 
-      // Find the product in the cart and update its approval status
-      const productIndex = order.cart.findIndex(item => item._id.toString() === productId);
+      const productIndex = order.cart.findIndex(item => item._id === productId);
       if (productIndex === -1) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
 
-      // Update the product's approval status
       order.cart[productIndex].approvalStatus = approvalStatus;
 
-      // Find the actual product document to update its reviews
-      const product = await Product.findById(order.cart[productIndex]._id);
+      const product = await Product.findById(productId);
       if (!product) {
         return next(new ErrorHandler("Product not found", 404));
       }
 
-      // Create and add the review
-      const review = {
-        user: {
-          _id: order.user._id,
-          firstname: order.user.firstname,
-          lastname: order.user.lastname,
-          email: order.user.email
-        },
-        rating: rating,
-        comment: comment,
-        productId: product._id,
-        createdAt: new Date()
-      };
+      if (approvalStatus === "Approved" && rating) {
+        const review = {
+          user: {
+            _id: order.user._id,
+            firstname: order.user.firstname,
+            lastname: order.user.lastname,
+            email: order.user.email
+          },
+          rating: rating,
+          comment: comment,
+          productId: product._id,
+          createdAt: new Date()
+        };
 
-      product.reviews.push(review);
+        product.reviews.push(review);
+        const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
+        product.ratings = totalRating / product.reviews.length;
+        await product.save();
 
-      // Update product's average rating
-      const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
-      product.ratings = totalRating / product.reviews.length;
-
-      // Save both the order and product
-      await Promise.all([order.save(), product.save()]);
-
-      if (approvalStatus === "Approved") {
         const adminEmail = "villajamarketplace@gmail.com";
         const userId = String(order.user._id);
         const userEmail = order.user.email;
-        const subject = `Order Confirmation ${approvalStatus}`;
+        const subject = `Order Product ${approvalStatus}`;
 
-        //seller email message
+        // seller email message
         const sellerMessage = `
         <html>
             <body>
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Approval Received</h2>
+                <h2>Product Approval Received</h2>
                 <p>
-                 Congratulations! An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
-                </p>
-                <p>
-                  Order ID: ${order._id}
-                </p>
-                <p>
-                  Product: ${product.name}
-                </p>
-                <p>
-                  Rating: ${rating}/5
-                </p>
-                <p>
-                  Review: "${comment}"
-                </p>
-                <p>
-                  Total Price: ${order.totalPrice}
-                </p>
-                <p>
-                 The total price has been added to your available balance to withdraw.
-                </p>
-                <p>
-                  Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
-               </p>
-                <p>
-                  Best regards,</br>
-                  The Villaja Team
-                </p>
-              </div>
-            </body>
-          </html>
-        `;
-
-        //user email message    
-        const userMessage = `
-        <html>
-            <body>
-              <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Approval Given</h2>
-                <p>
-                  You have successfully ${approvalStatus.toLowerCase()} your order with ID ${order._id}.
-                </p>
-                <p>
-                  Order ID: ${order._id}
-                </p>
-                <p>
-                  Product: ${product.name}
-                </p>
-                <p>
-                  Your Rating: ${rating}/5
-                </p>
-                <p>
-                  Your Review: "${comment}"
-                </p>
-                <p>
-                  Total Price: ${order.totalPrice}
-                </p>
-                <p>
-                 Thank you for shopping with us!
-                </p>
-                <p>
-                  Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
-               </p>
-                <p>
-                  Best regards,</br>
-                  The Villaja Team
-                </p>
-              </div>
-            </body>
-          </html>
-        `;
-
-        //admin email message 
-        const adminMessage = `
-        <html>
-            <body>
-              <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Approval Received</h2>
-                <p>
-                  An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                 Congratulations! A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -644,7 +667,37 @@ router.put(
                   Customer Review: "${comment}"
                 </p>
                 <p>
-                  Total Price: ${order.totalPrice}
+                  Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+               </p>
+                <p>
+                  Best regards,</br>
+                  The Villaja Team
+                </p>
+              </div>
+            </body>
+          </html>
+        `;
+
+        // user email message    
+        const userMessage = `
+        <html>
+            <body>
+              <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+                <h2>Product Approval Given</h2>
+                <p>
+                  You have successfully ${approvalStatus.toLowerCase()} the product from your order.
+                </p>
+                <p>
+                  Order ID: ${order._id}
+                </p>
+                <p>
+                  Product: ${product.name}
+                </p>
+                <p>
+                  Your Rating: ${rating}/5
+                </p>
+                <p>
+                  Your Review: "${comment}"
                 </p>
                 <p>
                   Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
@@ -658,7 +711,40 @@ router.put(
           </html>
         `;
 
-        //Send email notification to the user 
+        // admin email message 
+        const adminMessage = `
+        <html>
+            <body>
+              <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+                <h2>Product Approval Received</h2>
+                <p>
+                  A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                </p>
+                <p>
+                  Order ID: ${order._id}
+                </p>
+                <p>
+                  Product: ${product.name}
+                </p>
+                <p>
+                  Customer Rating: ${rating}/5
+                </p>
+                <p>
+                  Customer Review: "${comment}"
+                </p>
+                <p>
+                  Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+               </p>
+                <p>
+                  Best regards,</br>
+                  The Villaja Team
+                </p>
+              </div>
+            </body>
+          </html>
+        `;
+
+        // Send email notification to the user 
         const sendUserEmail = () => {
           return new Promise((resolve, reject) => {
             const mailOptions = {
@@ -678,7 +764,7 @@ router.put(
           });
         };
 
-        //Send email notification to the admin
+        // Send email notification to the admin
         const sendAdminEmail = () => {
           return new Promise((resolve, reject) => {
             const mailOptions = {
@@ -698,12 +784,12 @@ router.put(
           });
         };
 
-        // Send email to seller
+        // Send email notification to the seller
         const sendSellerEmail = () => {
           return new Promise((resolve, reject) => {
             const mailOptions = {
               from: 'villajamarketplace@gmail.com',
-              to: product.shop.email,
+              to: order.cart[productIndex].shop.email,
               subject: subject,
               html: sellerMessage
             };
@@ -719,60 +805,49 @@ router.put(
         };
 
         try {
-          await Promise.all([
-            sendUserEmail(),
-            sendAdminEmail(),
-            sendSellerEmail()
-          ]);
-          console.log('Approved order email sent to user, admin and seller');
+          await sendUserEmail();
+          await sendAdminEmail();
+          await sendSellerEmail();
+          console.log('Approval emails sent successfully');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
 
-        // Send mobile app push notification to user
-        const { token: userToken } = await getToken(userId);
+        // Send push notification
+        const userToken = await getToken(userId);
         if (userToken) {
-          expo.sendPushNotificationsAsync([{
-            to: userToken,
-            title: `${approvalStatus} Order Approval`,
-            body: `You have successfully ${approvalStatus.toLowerCase()} your order with ID ${order._id}`
-          }]);
-        }
-
-        // Send mobile app push notification to seller
-        const sellerId = String(product.shop._id);
-        const { token: sellerToken } = await getToken(sellerId);
-        if (sellerToken) {
-          expo.sendPushNotificationsAsync([{
-            to: sellerToken,
-            title: `${approvalStatus} Order Approval`,
-            body: `An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}`
+          await expo.sendPushNotificationsAsync([{
+            to: userToken.token,
+            title: `Product ${approvalStatus}`,
+            body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order`
           }]);
         }
 
       } else if (approvalStatus === "Declined") {
-        // Create order issue ticket
         await createOrderIssue(
-          order._id,
+          orderId,
           order.user._id,
-          product.shop._id,
-          product._id,
-          product.discountPrice || product.originalPrice,
+          order.cart[productIndex].shop._id,
+          productId,
+          order.cart[productIndex].discountPrice || order.cart[productIndex].originalPrice,
           order.user.email,
-          product.shop.email,
-          reason
+          order.cart[productIndex].shop.email,
+          comment
         );
 
-        const subject = `Order ${approvalStatus}`;
+        const adminEmail = "villajamarketplace@gmail.com";
+        const userId = String(order.user._id);
+        const userEmail = order.user.email;
+        const subject = `Order Product ${approvalStatus}`;
 
-        //seller email message for declined order
+        // seller email message
         const sellerMessage = `
         <html>
             <body>
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Declined</h2>
+                <h2>Product Declined</h2>
                 <p>
-                  An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                  A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -781,16 +856,7 @@ router.put(
                   Product: ${product.name}
                 </p>
                 <p>
-                  Rating: ${rating}/5
-                </p>
-                <p>
-                  Review: "${comment}"
-                </p>
-                <p>
-                  Reason for Decline: "${reason}"
-                </p>
-                <p>
-                  Total Price: ${order.totalPrice}
+                  Reason: ${comment}
                 </p>
                 <p>
                  You have 48 hours to respond to this order issue on your dashboard before the order is automatically cancelled and the user is refunded.
@@ -810,14 +876,14 @@ router.put(
           </html>
         `;
 
-        //user email message for declined order   
+        // user email message    
         const userMessage = `
         <html>
             <body>
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Decline Raised</h2>
+                <h2>Product Decline Raised</h2>
                 <p>
-                  You have successfully ${approvalStatus.toLowerCase()} your order with ID ${order._id}. An order issue ticket will be raised immediately to alert the seller of the product you ordered.
+                  You have successfully ${approvalStatus.toLowerCase()} the product from your order. An order issue ticket will be raised immediately to alert the seller.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -826,22 +892,10 @@ router.put(
                   Product: ${product.name}
                 </p>
                 <p>
-                  Your Rating: ${rating}/5
+                  Reason: ${comment}
                 </p>
                 <p>
-                  Your Review: "${comment}"
-                </p>
-                <p>
-                  Reason for Decline: "${reason}"
-                </p>
-                <p>
-                  Total Price: ${order.totalPrice}
-                </p>
-                <p>
-                 A response from the seller of this product will be sent to you via chat on the app and if no response is received within 48 hours, the order will be automatically cancelled and you will be refunded.
-                </p>
-                <p>
-                 Thank you for shopping with us!
+                 A response from the seller will be sent to you via chat on the app and if no response is received within 48 hours, the order will be automatically cancelled and you will be refunded.
                 </p>
                 <p>
                   Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
@@ -855,14 +909,14 @@ router.put(
           </html>
         `;
 
-        //admin email message for declined order
+        // admin email message 
         const adminMessage = `
         <html>
             <body>
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
-                <h2>New Order Decline Received</h2>
+                <h2>Product Decline Received</h2>
                 <p>
-                  An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname} ordered from ${product.shop.name}.
+                  A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname} ordered from ${order.cart[productIndex].shop.name}.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -871,16 +925,7 @@ router.put(
                   Product: ${product.name}
                 </p>
                 <p>
-                  Customer Rating: ${rating}/5
-                </p>
-                <p>
-                  Customer Review: "${comment}"
-                </p>
-                <p>
-                  Reason for Decline: "${reason}"
-                </p>
-                <p>
-                  Total Price: ${order.totalPrice}
+                  Reason: ${comment}
                 </p>
                 <p>
                   Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
@@ -894,77 +939,102 @@ router.put(
           </html>
         `;
 
-        // Send emails
-        const sendEmails = async () => {
-          const mailOptions = [
-            {
+        // Send email notification to the user 
+        const sendUserEmail = () => {
+          return new Promise((resolve, reject) => {
+            const mailOptions = {
               from: 'villajamarketplace@gmail.com',
-              to: product.shop.email,
-              subject,
-              html: sellerMessage
-            },
-            {
-              from: 'villajamarketplace@gmail.com',
-              to: order.user.email,
-              subject,
+              to: userEmail,
+              subject: subject,
               html: userMessage
-            },
-            {
-              from: 'villajamarketplace@gmail.com',
-              to: 'villajamarketplace@gmail.com',
-              subject,
-              html: adminMessage
-            }
-          ];
+            };
 
-          await Promise.all(
-            mailOptions.map(options => 
-              new Promise((resolve, reject) => {
-                transporter.sendMail(options, (error, info) => {
-                  if (error) {
-                    reject(error);
-                  } else {
-                    resolve('Email sent');
-                  }
-                });
-              })
-            )
-          );
+            transporter.sendMail(mailOptions, (error, info) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve('Email sent');
+              }
+            });
+          });
+        };
+
+        // Send email notification to the admin
+        const sendAdminEmail = () => {
+          return new Promise((resolve, reject) => {
+            const mailOptions = {
+              from: 'villajamarketplace@gmail.com',
+              to: adminEmail,
+              subject: subject,
+              html: adminMessage
+            };
+
+            transporter.sendMail(mailOptions, (error, info) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve('Email sent');
+              }
+            });
+          });
+        };
+
+        // Send email notification to the seller
+        const sendSellerEmail = () => {
+          return new Promise((resolve, reject) => {
+            const mailOptions = {
+              from: 'villajamarketplace@gmail.com',
+              to: order.cart[productIndex].shop.email,
+              subject: subject,
+              html: sellerMessage
+            };
+
+            transporter.sendMail(mailOptions, (error, info) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve('Email sent');
+              }
+            });
+          });
         };
 
         try {
-          await sendEmails();
-          console.log('Declined order emails sent successfully');
+          await sendUserEmail();
+          await sendAdminEmail();
+          await sendSellerEmail();
+          console.log('Decline emails sent successfully');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
 
-        // Send mobile app push notifications
-        const { token: userToken } = await getToken(order.user._id.toString());
+        // Send push notifications
+        const userToken = await getToken(userId);
         if (userToken) {
-          expo.sendPushNotificationsAsync([{
-            to: userToken,
-            title: `${approvalStatus} Order Approval`,
-            body: `You have successfully ${approvalStatus.toLowerCase()} your order with ID ${order._id}. An order issue ticket will be raised immediately to alert the seller of the product you ordered.`
+          await expo.sendPushNotificationsAsync([{
+            to: userToken.token,
+            title: `Product ${approvalStatus}`,
+            body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order. An order issue ticket will be raised immediately.`
           }]);
         }
 
-        const sellerId = String(product.shop._id);
-        const { token: sellerToken } = await getToken(sellerId);
+        const sellerId = String(order.cart[productIndex].shop._id);
+        const sellerToken = await getToken(sellerId);
         if (sellerToken) {
-          expo.sendPushNotificationsAsync([{
-            to: sellerToken,
-            title: `${approvalStatus} Order Approval`,
-            body: `An order has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}. You have 48 hours to respond to this order issue on your dashboard before the order is automatically cancelled and the user is refunded.`
+          await expo.sendPushNotificationsAsync([{
+            to: sellerToken.token,
+            title: `Product ${approvalStatus}`,
+            body: `A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}. You have 48 hours to respond.`
           }]);
         }
       }
 
+      await order.save();
+
       res.status(200).json({
         success: true,
-        message: `Product approval status updated to ${approvalStatus} and review added`,
-        order,
-        product
+        message: `Product approval status updated to ${approvalStatus}`,
+        order
       });
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
