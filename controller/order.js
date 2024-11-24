@@ -616,23 +616,25 @@ router.put(
 
       console.log('cartIndex:', cartIndex);
 
+      // 1. Fetch the order
       const order = await Order.findById(orderId).populate('user');
       if (!order) {
         return next(new ErrorHandler("Order not found with this ID", 404));
       }
 
-      if (cartIndex === undefined || !order.cart[cartIndex]) {
+      // 2. Get the specific product from order's cart
+      const cartIndexNum = Number(cartIndex);
+      if (cartIndexNum < 0 || !order.cart[cartIndexNum]) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
 
-      order.cart[cartIndex].approvalStatus = approvalStatus;
-
+      // 3. Get the product from database
       const product = await Product.findById(productId);
       if (!product) {
         return next(new ErrorHandler("Product not found", 404));
       }
 
-      if (approvalStatus === "Approved" && rating) {
+      if (approvalStatus === "Approved") {
         const review = {
           user: {
             _id: order.user._id,
@@ -649,11 +651,16 @@ router.put(
         product.reviews.push(review);
         const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
         product.ratings = totalRating / product.reviews.length;
-        
-        order.cart[cartIndex].reviews = product.reviews;
-        order.cart[cartIndex].ratings = product.ratings;
-        
+
         await product.save();
+
+        // Update the product in the order's cart
+        order.cart[cartIndexNum] = {
+          ...order.cart[cartIndexNum],
+          approvalStatus: approvalStatus,
+          reviews: product.reviews,
+          ratings: rating,
+        };
 
         const adminEmail = "villajamarketplace@gmail.com";
         const userId = String(order.user._id);
