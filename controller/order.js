@@ -535,15 +535,15 @@ router.put(
 
         // Find the index of the color to update
         const colorIndex = product.colorList.findIndex((cl) => cl.color === color);
-        
+
         if (colorIndex !== -1) {
           // Ensure the stock values are valid numbers
           const currentStock = Number(product.colorList[colorIndex].stock) || 0;
           const deductStock = Number(qty) || 0;
-          
+
           // Prevent negative stock
           const newStock = Math.max(0, currentStock - deductStock);
-          
+
           product.colorList[colorIndex].stock = newStock;
 
           // Update the overall product stock and sold_out
@@ -619,10 +619,15 @@ router.put(
       console.log('1. Starting update-product-approval...');
 
       const { approvalStatus, rating, comment, cartIndex } = req.body;
+      console.log('cartIndex:', cartIndex);
+      console.log('approvalStatus:', approvalStatus);
       const { orderId, productId } = req.params;
 
       console.log('2. Finding order...');
       const order = await Order.findById(orderId).populate('user');
+      console.log('order found:', order._id);
+      console.log('cart length:', order.cart.length);
+      console.log('product at index:', order.cart[cartIndex]);
       if (!order) {
         return next(new ErrorHandler("Order not found with this ID", 404));
       }
@@ -637,6 +642,13 @@ router.put(
       if (!product) {
         return next(new ErrorHandler("Product not found", 404));
       }
+
+      console.log(approvalStatus);
+      console.log(rating);
+      console.log(comment);
+      console.log(cartIndex);
+      console.log(orderId);
+      console.log(productId);
 
       if (approvalStatus === "Approved" && rating) {
         console.log('6. Processing approved product with rating...');
