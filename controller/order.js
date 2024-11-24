@@ -628,7 +628,7 @@ router.put(
       }
 
       console.log('3. Finding product in cart...');
-      const productIndex = order.cart.findIndex(item => item._id === productId);
+      const productIndex = order.cart.findIndex(item => item._id.toString() === productId);
       if (productIndex === -1) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
