@@ -618,7 +618,7 @@ router.put(
     try {
       console.log('1. Starting update-product-approval...');
 
-      const { approvalStatus, rating, comment } = req.body;
+      const { approvalStatus, rating, comment, cartIndex } = req.body;
       const { orderId, productId } = req.params;
 
       console.log('2. Finding order...');
@@ -628,13 +628,9 @@ router.put(
       }
 
       console.log('3. Finding product in cart...');
-      const productIndex = order.cart.findIndex(item => item._id.toString() === productId);
-      if (productIndex === -1) {
+      if (cartIndex === undefined || !order.cart[cartIndex]) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
-
-      console.log('4. Updating approval status...');
-      order.cart[productIndex].approvalStatus = approvalStatus;
 
       console.log('5. Finding product in database...');
       const product = await Product.findById(productId);
@@ -656,6 +652,10 @@ router.put(
           productId: product._id,
           createdAt: new Date()
         };
+
+        order.cart[cartIndex].approvalStatus = approvalStatus;
+        order.cart[cartIndex].reviews = product.reviews;
+        order.cart[cartIndex].ratings = product.ratings;
 
         console.log('7. Review created and added to product');
         product.reviews.push(review);
@@ -813,7 +813,7 @@ router.put(
           return new Promise((resolve, reject) => {
             const mailOptions = {
               from: 'villajamarketplace@gmail.com',
-              to: order.cart[productIndex].shop.email,
+              to: order.cart[cartIndex].shop.email,
               subject: subject,
               html: sellerMessage
             };
@@ -839,10 +839,10 @@ router.put(
 
         console.log('9. Sending push notification...');
         // Send push notification
-        const userToken = await getToken(userId);
-        if (userToken) {
+        const { token } = await getToken(userId);
+        if (token) {
           await expo.sendPushNotificationsAsync([{
-            to: userToken.token,
+            to: token,
             title: `Product ${approvalStatus}`,
             body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order`
           }]);
@@ -854,11 +854,11 @@ router.put(
         await createOrderIssue(
           orderId,
           order.user._id,
-          order.cart[productIndex].shop._id,
+          order.cart[cartIndex].shop._id,
           productId,
-          order.cart[productIndex].discountPrice || order.cart[productIndex].originalPrice,
+          order.cart[cartIndex].discountPrice || order.cart[cartIndex].originalPrice,
           order.user.email,
-          order.cart[productIndex].shop.email,
+          order.cart[cartIndex].shop.email,
           comment
         );
 
@@ -943,7 +943,7 @@ router.put(
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
                 <h2>Product Decline Received</h2>
                 <p>
-                  A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname} ordered from ${order.cart[productIndex].shop.name}.
+                  A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname} ordered from ${order.cart[cartIndex].shop.name}.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -1012,7 +1012,7 @@ router.put(
           return new Promise((resolve, reject) => {
             const mailOptions = {
               from: 'villajamarketplace@gmail.com',
-              to: order.cart[productIndex].shop.email,
+              to: order.cart[cartIndex].shop.email,
               subject: subject,
               html: sellerMessage
             };
@@ -1047,7 +1047,7 @@ router.put(
           }]);
         }
 
-        const sellerId = String(order.cart[productIndex].shop._id);
+        const sellerId = String(order.cart[cartIndex].shop._id);
         const sellerToken = await getToken(sellerId);
         if (sellerToken) {
           await expo.sendPushNotificationsAsync([{
