@@ -121,7 +121,6 @@ router.post(
 
         try {
           await sendShopEmail();
-          console.log('Confirmation email sent to shop owner');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
@@ -183,7 +182,6 @@ router.post(
 
       try {
         await sendAdminEmail();
-        console.log('Confirmation email sent to admin');
       } catch (error) {
         console.error('Email sending failed:', error);
       }
@@ -245,7 +243,6 @@ router.post(
 
       try {
         await sendUserEmail();
-        console.log('Confirmation email sent to user');
       } catch (error) {
         console.error('Email sending failed:', error);
       }
@@ -377,7 +374,6 @@ router.put(
 
         try {
           await sendUserEmail(); // Wait for the email to be sent to the user
-          console.log('Notification email sent to the user');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
@@ -512,7 +508,6 @@ router.put(
 
         try {
           await sendUserEmail(); // Wait for the email to be sent to the user
-          console.log('Notification email sent to the user');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
@@ -616,42 +611,28 @@ router.put(
   isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     try {
-      console.log('1. Starting update-product-approval...');
-
       const { approvalStatus, rating, comment, cartIndex } = req.body;
-      console.log('cartIndex:', cartIndex);
-      console.log('approvalStatus:', approvalStatus);
       const { orderId, productId } = req.params;
 
-      console.log('2. Finding order...');
+      console.log('cartIndex:', cartIndex);
+
       const order = await Order.findById(orderId).populate('user');
-      console.log('order found:', order._id);
-      console.log('cart length:', order.cart.length);
-      console.log('product at index:', order.cart[cartIndex]);
       if (!order) {
         return next(new ErrorHandler("Order not found with this ID", 404));
       }
 
-      console.log('3. Finding product in cart...');
       if (cartIndex === undefined || !order.cart[cartIndex]) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
 
-      console.log('5. Finding product in database...');
+      order.cart[cartIndex].approvalStatus = approvalStatus;
+
       const product = await Product.findById(productId);
       if (!product) {
         return next(new ErrorHandler("Product not found", 404));
       }
 
-      console.log(approvalStatus);
-      console.log(rating);
-      console.log(comment);
-      console.log(cartIndex);
-      console.log(orderId);
-      console.log(productId);
-
       if (approvalStatus === "Approved" && rating) {
-        console.log('6. Processing approved product with rating...');
         const review = {
           user: {
             _id: order.user._id,
@@ -665,14 +646,13 @@ router.put(
           createdAt: new Date()
         };
 
-        order.cart[cartIndex].approvalStatus = approvalStatus;
-        order.cart[cartIndex].reviews = product.reviews;
-        order.cart[cartIndex].ratings = product.ratings;
-
-        console.log('7. Review created and added to product');
         product.reviews.push(review);
         const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
         product.ratings = totalRating / product.reviews.length;
+        
+        order.cart[cartIndex].reviews = product.reviews;
+        order.cart[cartIndex].ratings = product.ratings;
+        
         await product.save();
 
         const adminEmail = "villajamarketplace@gmail.com";
@@ -779,7 +759,6 @@ router.put(
           </html>
         `;
 
-        console.log('8. Sending approval emails...');
         // Send email notification to the user 
         const sendUserEmail = () => {
           return new Promise((resolve, reject) => {
@@ -844,25 +823,20 @@ router.put(
           await sendUserEmail();
           await sendAdminEmail();
           await sendSellerEmail();
-          console.log('Approval emails sent successfully');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
 
-        console.log('9. Sending push notification...');
-        // Send push notification
-        const { token } = await getToken(userId);
-        if (token) {
+        const userToken = await getToken(userId);
+        if (userToken) {
           await expo.sendPushNotificationsAsync([{
-            to: token,
+            to: userToken.token,
             title: `Product ${approvalStatus}`,
             body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order`
           }]);
         }
 
       } else if (approvalStatus === "Declined") {
-        console.log('6. Processing declined product...');
-        console.log('7. Creating order issue...');
         await createOrderIssue(
           orderId,
           order.user._id,
@@ -978,7 +952,6 @@ router.put(
           </html>
         `;
 
-        console.log('8. Sending decline emails...');
         // Send email notification to the user 
         const sendUserEmail = () => {
           return new Promise((resolve, reject) => {
@@ -1043,13 +1016,10 @@ router.put(
           await sendUserEmail();
           await sendAdminEmail();
           await sendSellerEmail();
-          console.log('Decline emails sent successfully');
         } catch (error) {
           console.error('Email sending failed:', error);
         }
 
-        console.log('9. Sending push notifications...');
-        // Send push notifications
         const userToken = await getToken(userId);
         if (userToken) {
           await expo.sendPushNotificationsAsync([{
@@ -1070,10 +1040,8 @@ router.put(
         }
       }
 
-      console.log('10. Saving final order update...');
       await order.save();
 
-      console.log('11. Request completed successfully');
       res.status(200).json({
         success: true,
         message: `Product approval status updated to ${approvalStatus}`,
