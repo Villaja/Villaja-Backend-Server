@@ -3,7 +3,6 @@ const router = express()
 const Refund = require('../model/refund')
 const Order = require('../model/order')
 const ErrorHandler = require("../utils/ErrorHandler");
-const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const validateRefundPayload = require('../validation/refundValidation');
 const { default: axios } = require('axios');
@@ -46,7 +45,7 @@ router.post('/create-refund', async (req, res, next) => {
         }}
         const payload = JSON.stringify({
             transaction:transactionRef,
-            amount
+            amount: parseFloat(amount) * 100
         })
 
         console.log('paystack request start');
@@ -93,9 +92,10 @@ router.post('/create-refund', async (req, res, next) => {
         }
 
     }
-    catch(e)
+    catch(error)
     {
-        return console.log(e.message)
+        console.log('error processing refund ',error.message)
+        return next(new ErrorHandler(error.message, 500));
     }
 })
 
