@@ -842,6 +842,34 @@ router.put(
         }
 
       } else if (approvalStatus === "Declined") {
+        // Update the product in the order's cart
+        order.cart[cartIndex] = {
+          ...order.cart[cartIndex],
+          approvalStatus: approvalStatus,
+          reviews: product.reviews,
+          ratings: rating,
+        };
+
+        // Add review to the product
+        const review = {
+          user: {
+            _id: order.user._id,
+            firstname: order.user.firstname,
+            lastname: order.user.lastname,
+            email: order.user.email
+          },
+          rating: rating,
+          comment: comment,
+          productId: product._id,
+          createdAt: new Date()
+        };
+
+        product.reviews.push(review);
+        const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
+        product.ratings = totalRating / product.reviews.length;
+
+        await product.save();
+
         await createOrderIssue(
           orderId,
           order.user._id,
