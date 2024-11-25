@@ -611,7 +611,7 @@ router.put(
   isAuthenticated,
   catchAsyncErrors(async (req, res, next) => {
     try {
-      const { approvalStatus, rating, comment, cartIndex } = req.body;
+      const { approvalStatus, rating, comment } = req.body;
       const { orderId, productId } = req.params;
 
       console.log('cartIndex:', cartIndex);
@@ -623,8 +623,8 @@ router.put(
       }
 
       // 2. Get the specific product from order's cart
-      const cartIndexNum = Number(cartIndex);
-      if (cartIndexNum < 0 || !order.cart[cartIndexNum]) {
+      const cartIndex = order.cart.findIndex(item => item._id.toString() === productId);
+      if (cartIndex === -1) {
         return next(new ErrorHandler("Product not found in order", 404));
       }
 
