@@ -1054,28 +1054,23 @@ router.put(
           console.error('Email sending failed:', error);
         }
 
-        try {
-          const userToken = await getToken(userId);
-          if (userToken && userToken.token) {
-            await expo.sendPushNotificationsAsync([{
-              to: userToken.token,
-              title: `Product ${approvalStatus}`,
-              body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order. An order issue ticket will be raised immediately.`
-            }]);
-          }
+        const userToken = await getToken(userId);
+        if (userToken) {
+          await expo.sendPushNotificationsAsync([{
+            to: userToken.token,
+            title: `Product ${approvalStatus}`,
+            body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order. An order issue ticket will be raised immediately.`
+          }]);
+        }
 
-          const sellerId = String(order.cart[cartIndex].shop._id);
-          const sellerToken = await getToken(sellerId);
-          if (sellerToken && sellerToken.token) {
-            await expo.sendPushNotificationsAsync([{
-              to: sellerToken.token,
-              title: `Product ${approvalStatus}`,
-              body: `A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}. You have 48 hours to respond.`
-            }]);
-          }
-        } catch (error) {
-          console.error('Push notification error:', error);
-          // Continue execution even if push notification fails
+        const sellerId = String(order.cart[cartIndex].shop._id);
+        const sellerToken = await getToken(sellerId);
+        if (sellerToken) {
+          await expo.sendPushNotificationsAsync([{
+            to: sellerToken.token,
+            title: `Product ${approvalStatus}`,
+            body: `A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}. You have 48 hours to respond.`
+          }]);
         }
       }
 
