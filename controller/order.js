@@ -614,24 +614,22 @@ router.put(
       const { approvalStatus, rating, comment } = req.body;
       const { orderId, productId } = req.params;
 
-      console.log('cartIndex:', cartIndex);
-
       // 1. Fetch the order
       const order = await Order.findById(orderId).populate('user');
       if (!order) {
         return next(new ErrorHandler("Order not found with this ID", 404));
       }
 
-      // 2. Get the specific product from order's cart
-      const cartIndex = order.cart.findIndex(item => item._id.toString() === productId);
-      if (cartIndex === -1) {
-        return next(new ErrorHandler("Product not found in order", 404));
-      }
-
-      // 3. Get the product from database
+      // 2. Get the actual product from database first
       const product = await Product.findById(productId);
       if (!product) {
         return next(new ErrorHandler("Product not found", 404));
+      }
+
+      // 3. Find the product index in cart using productId
+      const cartIndex = order.cart.findIndex(item => item._id.toString() === productId);
+      if (cartIndex === -1) {
+        return next(new ErrorHandler("Product not found in order", 404));
       }
 
       if (approvalStatus === "Approved") {
