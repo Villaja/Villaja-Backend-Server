@@ -655,8 +655,8 @@ router.put(
         await product.save();
 
         // Update the product in the order's cart
-        order.cart[cartIndexNum] = {
-          ...order.cart[cartIndexNum],
+        order.cart[cartIndex] = {
+          ...order.cart[cartIndex],
           approvalStatus: approvalStatus,
           reviews: product.reviews,
           ratings: rating,
