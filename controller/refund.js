@@ -8,8 +8,7 @@ const validateRefundPayload = require('../validation/refundValidation');
 const { default: axios } = require('axios');
 
 
-router.post('/create-refund', async (req, res, next) => {
-
+router.post('/create-refund', isAuthenticated, isAdmin('Admin'), async (req, res, next) => {
     let validation = validateRefundPayload(req.body)
     if (validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
 
@@ -79,6 +78,9 @@ router.post('/create-refund', async (req, res, next) => {
 
             await refund.save()
 
+            order.status = 'Refunded'
+            await order.save()
+
             success(res,status,message,apiResponse,200)
         }
         else
@@ -99,7 +101,19 @@ router.post('/create-refund', async (req, res, next) => {
     }
 })
 
-
+router.get('/get-all-refunds',isAuthenticated, isAdmin('Admin'), async(req,res,next) => {
+    try {
+        const refunds  = (await Refund.find()).reverse()
+        console.log('Successfully retrieved refunds');
+        return success(res,true,'Successfully retrieved refunds',refunds,200)
+        
+    }
+    catch(e)
+    {
+        console.log('error returning refunds ',error.message)
+        return next(new ErrorHandler(error.message, 500));
+    }
+})
 
 const success = (res,status,message,data = [],code = 200) => {
     return res.status(code).json(

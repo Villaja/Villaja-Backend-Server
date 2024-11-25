@@ -290,7 +290,7 @@ router.put(
 
       const review = {
         user,
-        rating,
+        rating:rating.toFixed(1),
         comment,
         productId,
       };
