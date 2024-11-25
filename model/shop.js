@@ -67,6 +67,22 @@ const shopSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  bankDetails: [
+    {
+      accountNumber: {
+        type: Number,
+        required: true,
+      },
+      bankName: {
+        type: String,
+        required: true,
+      },
+      accountHolderName: {
+        type: String,
+        required: true,
+      },
+    },
+  ],
   transections: [
     {
       amount: {
@@ -86,6 +102,7 @@ const shopSchema = new mongoose.Schema({
       },
     },
   ],
+  pushNotificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpiry: Date, 
   createdAt: {

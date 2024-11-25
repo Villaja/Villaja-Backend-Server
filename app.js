@@ -6,6 +6,7 @@ const cors = require("cors");
 const cron = require('node-cron');
 const Product = require('./model/product');
 const createExchangeRateUpdater  = require("price-to-exchange-rate-update");
+const { saveToken } = require('./Firebase');
 
 app.use(cors({
   origin: ['*', 'http://localhost:3000', 'https://villaja-frontend.vercel.app', "https://www.villaja.com"],

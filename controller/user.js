@@ -12,7 +12,8 @@ const sendToken = require("../utils/jwtToken");
 const { isAuthenticated, isAdmin } = require("../middleware/auth");
 const crypto = require('crypto');
 const Joi = require('joi')
-Joi.objectId = require('joi-objectid')(Joi)
+Joi.objectId = require('joi-objectid')(Joi);
+const { saveToken } = require('../Firebase');
 
 
 const transporter = nodemailer.createTransport({
@@ -31,7 +32,7 @@ const transporter = nodemailer.createTransport({
 // register
 router.post('/register', async (req, res, next) => {
   try {
-    const { firstname, lastname, email, phoneNumber, password } = req.body;
+    const { firstname, lastname, email, phoneNumber, password, pushNotificationToken } = req.body;
 
     let validation = validateRegistration(req.body);
     if (validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
@@ -49,11 +50,12 @@ router.post('/register', async (req, res, next) => {
       phoneNumber: phoneNumber,
       password: password,
       emailVerificationCode: crypto.randomBytes(3).toString('hex').toUpperCase(),
+      pushNotificationToken: pushNotificationToken,
     });
 
     // Generate a JWT token for the newly registered user
     const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET_KEY, {
-      expiresIn: '90d', // You can set the token expiration as needed
+      expiresIn: '90d',
     });
 
     const verificationLink = `https://villajabackendserver-48y0h87u.b4a.run/api/user/verify-email/${newUser._id}/${newUser.emailVerificationCode}`;
@@ -92,10 +94,10 @@ router.post('/register', async (req, res, next) => {
     const sendEmail = () => {
       return new Promise((resolve, reject) => {
         const mailOptions = {
-          from: 'villajamarketplace@gmail.com', // Sender email
-          to: email, // Receiver email (the user's email)
+          from: 'villajamarketplace@gmail.com',
+          to: email,
           subject: 'Welcome to Villaja, Activate Account',
-          html: emailHTML, // Use the HTML content for styling and structure
+          html: emailHTML,
         };
 
         transporter.sendMail(mailOptions, (error, info) => {
@@ -109,18 +111,24 @@ router.post('/register', async (req, res, next) => {
     };
 
     try {
-      await sendEmail(); // Wait for the email to be sent
+      await sendEmail();
       console.log('Welcome email sent successfully');
+      
+      // Save the push notification token
+      const userId = String(newUser._id);
+      const expoToken = String(pushNotificationToken);
+      await saveToken(userId, expoToken);
+
+      // Send the response only after all operations are complete
+      res.status(201).json({
+        success: true,
+        user: newUser,
+        token,
+      });
     } catch (error) {
       console.error('Email sending failed:', error);
+      return next(new ErrorHandler('Registration successful but email sending failed', 500));
     }
-
-    // Send the token as part of the JSON response
-    res.status(201).json({
-      success: true,
-      user: newUser,
-      token,
-    });
   } catch (error) {
     console.log(error);
     return next(new ErrorHandler(error.message, 400));
