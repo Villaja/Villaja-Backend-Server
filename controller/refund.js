@@ -78,9 +78,6 @@ router.post('/create-refund', isAuthenticated, isAdmin('Admin'), async (req, res
 
             await refund.save()
 
-            order.status = 'Refunded'
-            await order.save()
-
             success(res,status,message,apiResponse,200)
         }
         else

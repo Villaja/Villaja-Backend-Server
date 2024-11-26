@@ -32,6 +32,17 @@ const orderSchema = new mongoose.Schema({
             type: String,
         },
     },
+    refunded:{
+        type:Boolean,
+        default:false
+    },
+    refundedAt:{
+        type:Date
+    },
+    badOrder:{
+        type:Boolean,
+        default:false
+    },
     paidAt: {
         type: Date,
         default: Date.now,
