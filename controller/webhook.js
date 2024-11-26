@@ -2,11 +2,6 @@ const express = require('express')
 const router = express()
 const Refund = require('../model/refund')
 const Order = require('../model/order')
-const ErrorHandler = require("../utils/ErrorHandler");
-const catchAsyncErrors = require("../middleware/catchAsyncErrors");
-const { isAuthenticated, isAdmin } = require("../middleware/auth");
-const {validateRefundPayload} = require('../validation/refundValidation');
-const { default: axios } = require('axios');
 
 router.all('/', async (req,res) => {
     console.log('webhook is called')
@@ -41,6 +36,13 @@ const handleRefund  = async (req,res) => {
         })
 
         await refund.save()
+
+        const order = await Order.findById(refund.orderId)
+        order.status = 'cancelled'
+        order.refunded = true
+        order.refundedAt = refund.updatedAt
+        order.badOrder = true
+        await order.save()
 
         console.log('refund successfully updated with status ',req.body.data.status);
     }
