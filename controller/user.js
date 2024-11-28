@@ -981,8 +981,72 @@ router.post('/reset-password', async (req, res, next) => {
   }
 });
 
+// Add notification to user
+router.post(
+  "/add-notification",
+  isAuthenticated,
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const { title, body } = req.body;
 
+      // Validate the notification data
+      const validateNotification = (data) => {
+        const schema = Joi.object({
+          title: Joi.string().required(),
+          body: Joi.string().required()
+        });
+        return schema.validate(data);
+      };
 
+      let validation = validateNotification(req.body);
+      if (validation.error) {
+        return next(new ErrorHandler(validation.error.details[0].message, 400));
+      }
 
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return next(new ErrorHandler("User not found", 404));
+      }
+
+      // Add the notification to the user's notificationList
+      user.notificationList.push({
+        title,
+        body,
+        createdAt: new Date()
+      });
+
+      await user.save();
+
+      res.status(201).json({
+        success: true,
+        message: "Notification added successfully",
+        notification: user.notificationList[user.notificationList.length - 1]
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
+// Get user notifications
+router.get(
+  "/notifications",
+  isAuthenticated,
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return next(new ErrorHandler("User not found", 404));
+      }
+
+      res.status(200).json({
+        success: true,
+        notifications: user.notificationList.sort((a, b) => b.createdAt - a.createdAt)
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
 
 module.exports = router;
