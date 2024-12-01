@@ -615,6 +615,89 @@ router.delete(
   })
 );
 
+// delete own user account
+router.delete(
+  "/delete-account",
+  isAuthenticated,
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const user = await User.findById(req.user.id).select("+password");
+      
+      // Verify password before deletion
+      const { password } = req.body;
+      if (!password) {
+        return next(new ErrorHandler("Please provide your password", 400));
+      }
+
+      const isPasswordValid = await user.comparePassword(password);
+      if (!isPasswordValid) {
+        return next(new ErrorHandler("Invalid password", 400));
+      }
+
+      // Send account deletion confirmation email
+      const emailHTML = `
+        <html>
+          <body>
+            <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+              <h2>Account Deleted</h2>
+              <p>
+                Hello ${user.firstname},
+              </p>
+              <p>
+                Your Villaja account has been successfully deleted at ${new Date().toLocaleString()}.
+              </p>
+              <p>
+                If you didn't request this deletion, please contact our support team immediately at:
+                <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+              </p>
+              <p>
+                Best regards,<br/>
+                The Villaja Team
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const sendEmail = () => {
+        return new Promise((resolve, reject) => {
+          const mailOptions = {
+            from: 'villajamarketplace@gmail.com',
+            to: user.email,
+            subject: 'Account Deleted - Villaja',
+            html: emailHTML,
+          };
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve('Email sent');
+            }
+          });
+        });
+      };
+
+      try {
+        await sendEmail();
+        console.log('Account deletion email sent successfully');
+      } catch (error) {
+        console.error('Email sending failed:', error);
+      }
+
+      // Delete the user
+      await User.findByIdAndDelete(req.user.id);
+
+      res.status(200).json({
+        success: true,
+        message: "Account deleted successfully",
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error.message, 500));
+    }
+  })
+);
+
 router.put(
   "/update-user-password",
   isAuthenticated,
