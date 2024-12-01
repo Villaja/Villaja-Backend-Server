@@ -76,6 +76,7 @@ router.post('/create-shop', catchAsyncErrors(async (req, res, next) => {
       phoneNumber: req.body.phoneNumber,
       zipCode: req.body.zipCode,
       pushNotificationToken: req.body.pushNotificationToken,
+      description: req.body.description
     };
 
     const newSeller = await Shop.create({
@@ -88,6 +89,7 @@ router.post('/create-shop', catchAsyncErrors(async (req, res, next) => {
       phoneNumber: seller.phoneNumber,
       emailVerificationCode: crypto.randomBytes(3).toString('hex').toUpperCase(),
       pushNotificationToken: seller.pushNotificationToken,
+      description: seller.description
     });
 
     // Generate a JWT token for the newly registered shop
