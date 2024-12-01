@@ -2,10 +2,10 @@ const express = require("express");
 const path = require("path");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const {validateCreateShop,
-    validateLoginShop,
-    validateUpdateShopAvatar,
-    validateUpdateSellerInfo,} = require('../validation/shopValidation')
+const { validateCreateShop,
+  validateLoginShop,
+  validateUpdateShopAvatar,
+  validateUpdateSellerInfo, } = require('../validation/shopValidation')
 const sendMail = require("../utils/sendMail");
 const Shop = require("../model/shop");
 const { isSeller, isAuthenticated, isAdmin } = require("../middleware/auth");
@@ -16,7 +16,8 @@ const sendShopToken = require("../utils/shopToken");
 const nodemailer = require('nodemailer')
 const crypto = require('crypto');
 const Joi = require('joi')
-Joi.objectId = require('joi-objectid')(Joi)
+Joi.objectId = require('joi-objectid')(Joi);
+const { saveToken } = require('../Firebase');
 
 
 const transporter = nodemailer.createTransport({
@@ -25,8 +26,8 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: 'villajamarketplace@gmail.com', 
-    pass: 'zzccxzuizilhkvhb',   
+    user: 'villajamarketplace@gmail.com',
+    pass: 'zzccxzuizilhkvhb',
   },
 });
 
@@ -160,19 +161,26 @@ router.post('/create-shop', catchAsyncErrors(async (req, res, next) => {
       });
     };
 
+
     try {
       await sendEmail(); // Wait for the email to be sent
       console.log('Welcome email sent successfully');
+
+      //save the push notification token
+      const sellerId = String(newSeller._id);
+      const expoToken = String(seller.pushNotificationToken);
+      await saveToken(sellerId, expoToken);
+
+      // Send the token as part of the JSON response
+      res.status(201).json({
+        success: true,
+        user: newSeller,
+        token,
+      });
     } catch (error) {
       console.error('Email sending failed:', error);
     }
 
-    // Send the token as part of the JSON response
-    res.status(201).json({
-      success: true,
-      user: newSeller,
-      token,
-    });
   } catch (error) {
     console.error('Error during shop creation:', error);
     return res.status(500).json({ error: error.message });
@@ -216,7 +224,7 @@ router.get('/verify-email/:userId/:verificationCode', async (req, res, next) => 
         </body>
         </html>
       `;
-    
+
       return res.status(200).send(alreadyVerifiedHTML);
     }
 
@@ -371,30 +379,30 @@ router.put(
   catchAsyncErrors(async (req, res, next) => {
     try {
       let validation = validateUpdateShopAvatar(req.body)
-      if(validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
-    
+      if (validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
+
       let existsSeller = await Shop.findById(req.seller._id);
 
-        const imageId = existsSeller.avatar.public_id;
+      const imageId = existsSeller.avatar.public_id;
 
-        await cloudinary.v2.uploader.destroy(imageId);
+      await cloudinary.v2.uploader.destroy(imageId);
 
-        const myCloud = await cloudinary.v2.uploader.upload(req.body.avatar, {
-          folder: "avatars",
-          width: 150,
-        });
+      const myCloud = await cloudinary.v2.uploader.upload(req.body.avatar, {
+        folder: "avatars",
+        width: 150,
+      });
 
-        existsSeller.avatar = {
-          public_id: myCloud.public_id,
-          url: myCloud.secure_url,
-        };
+      existsSeller.avatar = {
+        public_id: myCloud.public_id,
+        url: myCloud.secure_url,
+      };
 
-  
+
       await existsSeller.save();
 
       res.status(200).json({
         success: true,
-        seller:existsSeller,
+        seller: existsSeller,
       });
     } catch (error) {
       return next(new ErrorHandler(error.message, 500));
@@ -509,11 +517,11 @@ router.get(
 );
 
 // fetch all sellers for users
-router.get("/user-get-all-sellers", catchAsyncErrors(async(req,res,next)=>{
+router.get("/user-get-all-sellers", catchAsyncErrors(async (req, res, next) => {
   try {
-    const sellers = await Shop.find().sort({createdAt:-1});
+    const sellers = await Shop.find().sort({ createdAt: -1 });
     res.status(201).json({
-      success:true,
+      success: true,
       sellers,
     })
   } catch (error) {
