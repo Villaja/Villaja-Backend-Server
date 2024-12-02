@@ -659,6 +659,26 @@ router.delete(
         </html>
       `;
 
+      const adminEmailHTML = `
+        <html>
+          <body>
+            <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+              <h2>Account Deleted</h2>
+              <p>
+                A user account named ${user.firstname} ${user.lastname} has been deleted at ${new Date().toLocaleString()}.
+              </p>
+              <p>
+                The user's email address is ${user.email}.
+              </p>
+              <p>
+                If you need to contact the user, you can reach them at:
+                <a href="mailto:${user.email}">${user.email}</a>
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
       const sendEmail = () => {
         return new Promise((resolve, reject) => {
           const mailOptions = {
@@ -677,9 +697,29 @@ router.delete(
           });
         });
       };
+      
+      const sendAdminEmail = () => {
+        return new Promise((resolve, reject) => {
+          const mailOptions = {
+            from: 'villajamarketplace@gmail.com',
+            to: 'villajamarketplace@gmail.com',
+            subject: 'Account Deleted - Villaja',
+            html: adminEmailHTML,
+          };
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve('Email sent');
+            }
+          });
+        });
+      }
 
       try {
         await sendEmail();
+        await sendAdminEmail();
         console.log('Account deletion email sent successfully');
       } catch (error) {
         console.error('Email sending failed:', error);
