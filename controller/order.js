@@ -10,6 +10,8 @@ const nodemailer = require('nodemailer');
 const { getToken } = require('../Firebase');
 const { Expo } = require('expo-server-sdk');
 const { createOrderIssue } = require('./orderIssueController');
+const { startOrderAutomation } = require('./orderAutomation');
+
 
 
 const expo = new Expo();
@@ -457,8 +459,9 @@ router.put(
       if (req.body.status === "Delivered") {
         order.deliveredAt = Date.now();
         order.paymentInfo.status = "Succeeded";
-        const serviceCharge = order.totalPrice * 0.0;
-        await updateSellerInfo(order, order.totalPrice - serviceCharge);
+        
+        // Start the automation process
+        await startOrderAutomation(order._id);
       }
 
       await order.save({ validateBeforeSave: false });
@@ -660,6 +663,19 @@ router.put(
           ratings: rating,
         };
 
+        // Update seller's available balance
+        try {
+          const seller = await Shop.findById(order.cart[cartIndex].shop._id);
+          if (seller) {
+            const productPrice = order.cart[cartIndex].discountPrice == 0 || order.cart[cartIndex].discountPrice === null ? order.cart[cartIndex].originalPrice : order.cart[cartIndex].discountPrice;
+            seller.availableBalance += productPrice;
+            await seller.save();
+            console.log(`Seller's balance updated for product ${product.name} - Added ${productPrice}`);
+          }
+        } catch (error) {
+          console.error('Error updating seller balance:', error);
+        }
+
         const adminEmail = "villajamarketplace@gmail.com";
         const userId = String(order.user._id);
         const userEmail = order.user.email;
@@ -672,13 +688,19 @@ router.put(
               <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
                 <h2>Product Approval Received</h2>
                 <p>
-                 Congratulations! A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                 Congratulations! A product ${product.name} ordered by ${order.user.firstname} ${order.user.lastname} has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                </p>
+                <p>
+                  You can now withdraw your earnings of ₦${productPrice.toLocaleString()} from your dashboard.
                 </p>
                 <p>
                   Order ID: ${order._id}
                 </p>
                 <p>
                   Product: ${product.name}
+                </p>
+                <p>
+                  Price: ₦${productPrice.toLocaleString()}
                 </p>
                 <p>
                   Customer Rating: ${rating}/5
