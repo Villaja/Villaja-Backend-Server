@@ -27,9 +27,10 @@ router.all('/', async (req,res) => {
 const handleRefund  = async (req,res) => {
     try
     {
+        const nairaAmount = parseInt(req.body.data.amount)/100
         const refund = await Refund.findOneAndUpdate({
             transactionRef:req.body.data.transaction_reference,
-            amount:req.body.data.amount,
+            amount: nairaAmount,
         },{
             status:req.body.data.status,
             refundRef:req.body.data.refund_reference
@@ -43,6 +44,13 @@ const handleRefund  = async (req,res) => {
         order.refundedAt = refund.updatedAt
         order.badOrder = true
         await order.save()
+
+        const orderItems = order.cart.filter((item) => item._id === refund.productId)
+
+        const seller = await Shop.findById(orderItems[0].shop._id);
+        seller.availableBalance = seller.availableBalance - nairaAmount;
+
+        await seller.save()
 
         console.log('refund successfully updated with status ',req.body.data.status);
     }

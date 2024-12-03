@@ -9,6 +9,10 @@ const refundSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    productId:{
+        type: String,
+        required: true
+    },
     transactionRef:{
         type: String,
         required: true

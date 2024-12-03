@@ -14,25 +14,25 @@ router.post('/create-refund', isAuthenticated, isAdmin('Admin'), async (req, res
 
     try
     {
-        const {orderId,amount} = req.body
+        const {orderId,productId,amount} = req.body
 
         const order = await Order.findById(orderId)
 
         if(!order)
         {
-            error(res,false,'No order with this order id')
+            return error(res,false,'No order with this order id')
         }
 
         if(parseFloat(amount) > order.totalPrice)
         {
-            error(res,false,'amount cannot be more than order amount')
+            return error(res,false,'amount cannot be more than order amount')
         }
 
         const transactionRef = order.paymentInfo?.id
 
         if(!transactionRef)
         {
-            error(res,false,'No transaction reference for this order')
+            return error(res,false,'No transaction reference for this order')
         }
 
         const paystackBaseUrl = process.env.PAYSTACK_BASE_URL
@@ -67,6 +67,7 @@ router.post('/create-refund', isAuthenticated, isAdmin('Admin'), async (req, res
 
             const refund = await Refund.create({
                 orderId,
+                productId,
                 customerId:order.user._id,
                 transactionRef,
                 amount,
@@ -78,7 +79,7 @@ router.post('/create-refund', isAuthenticated, isAdmin('Admin'), async (req, res
 
             await refund.save()
 
-            success(res,status,message,apiResponse,200)
+            return success(res,status,message,apiResponse,200)
         }
         else
         {
@@ -111,6 +112,37 @@ router.get('/get-all-refunds',isAuthenticated, isAdmin('Admin'), async(req,res,n
         return next(new ErrorHandler(error.message, 500));
     }
 })
+
+router.post('/get-product-price',isAuthenticated, isAdmin('Admin'), async(req,res,next) => {
+    try{
+        const {orderId,productId} = req.body
+
+        const order = await Order.findById(orderId)
+
+        if(!order)
+        {
+            return error(res,false,'No order with this order id')
+        }
+        
+        const product = order.cart.filter((prod) => prod._id == productId)
+
+        if(!product)
+        {
+            return error(res,false,'No product with this order id')
+        }
+
+        return success(res,true,'product price retrieved successfully',{
+                price: product[0].discountPrice ?? product[0].originalPrice
+            },200)
+
+    }
+    catch(e)
+    {
+        console.log('error returning product amount ',e.message)
+        return next(new ErrorHandler(e.message, 500));
+    }
+})
+
 
 const success = (res,status,message,data = [],code = 200) => {
     return res.status(code).json(
