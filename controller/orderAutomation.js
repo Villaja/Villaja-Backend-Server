@@ -2,7 +2,7 @@ const schedule = require('node-schedule');
 const Order = require('../model/order');
 const nodemailer = require('nodemailer');
 const { Expo } = require('expo-server-sdk');
-const { getToken } = require('../utils/pushNotificationToken');
+const { getToken } = require('../Firebase');
 const Shop = require('../model/shop');
 
 const expo = new Expo();
