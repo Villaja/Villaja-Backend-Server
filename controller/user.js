@@ -416,8 +416,8 @@ router.post('/login', catchAsyncErrors(async (req, res, next) => {
           lastname: user.lastname,
           // Add other needed user fields but exclude sensitive data
         },
-        token
-      }
+      },
+      token
     });
 
   } catch (error) {
