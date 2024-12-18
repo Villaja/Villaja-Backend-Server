@@ -306,69 +306,105 @@ router.post('/login', catchAsyncErrors(async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    // Validation error
     let validation = validateLogin(req.body);
-    if (validation.error) return next(new ErrorHandler(validation.error.details[0].message, 400));
+    if (validation.error) {
+      return res.status(400).json({
+        success: false,
+        code: 'VALIDATION_ERROR',
+        message: validation.error.details[0].message,
+        errors: validation.error.details
+      });
+    }
 
+    // Missing fields error
     if (!email || !password) {
-      return next(new ErrorHandler('Please provide all fields!', 400));
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_FIELDS',
+        message: 'Please provide both email and password',
+        errors: {
+          email: !email ? 'Email is required' : null,
+          password: !password ? 'Password is required' : null
+        }
+      });
     }
 
     const user = await User.findOne({ email }).select('+password');
 
+    // User not found error
     if (!user) {
-      return next(new ErrorHandler("User doesn't exist!", 400));
+      return res.status(401).json({
+        success: false,
+        code: 'USER_NOT_FOUND',
+        message: 'No account found with this email address',
+      });
     }
 
+    // Email not verified error
     if (!user.isEmailVerified) {
-      return next(new ErrorHandler('Please Activate Your Account through your email and try again', 400));
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Please verify your email address before logging in',
+        data: {
+          requiresVerification: true,
+          email: user.email
+        }
+      });
     }
 
     const isPasswordValid = await user.comparePassword(password);
 
+    // Invalid password error
     if (!isPasswordValid) {
-      return next(new ErrorHandler('Invalid credentials', 400));
-    }
-
-    // If the user is valid, generate a JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
-      expiresIn: '10d', // You can set the token expiration as needed
-    });
-
-    // Send a welcome email to the user
-    const sendEmail = () => {
-      return new Promise((resolve, reject) => {
-        const mailOptions = {
-          from: 'villajamarketplace@gmail.com', // Sender email
-          to: user.email, // Receiver email (the user's email)
-          subject: 'You Just Logged In to Villaja',
-          html:`<h3>Hello ${user.firstname},</h3> <p>We're verifying a recent sign-in for ${email}</p> <p>Timestamp: ${new Date().toLocaleString()}</p> <p>If you believe that this sign-in is suspicious, please reset your password immediately.</p> <p>Thanks, </br></br> Villaja Team</p>`
-        };
-
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve('Email sent');
-          }
-        });
+      return res.status(401).json({
+        success: false,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid email or password',
       });
-    };
-
-    try {
-      await sendEmail(); // Wait for the email to be sent
-      console.log('Email sent successfully');
-    } catch (error) {
-      console.error('Email sending failed:', error);
     }
 
-    // Send the token as a JSON response
-    res.status(200).json({
-      success: true,
-      user,
-      token,
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
+      expiresIn: '10d',
     });
+
+    // Send login notification email
+    try {
+      await sendEmail();
+      console.log('Login notification email sent successfully');
+    } catch (emailError) {
+      console.error('Login notification email failed:', emailError);
+      // Don't block login if email fails
+    }
+
+    // Success response
+    return res.status(200).json({
+      success: true,
+      code: 'LOGIN_SUCCESS',
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          // Add other needed user fields but exclude sensitive data
+        },
+        token
+      }
+    });
+
   } catch (error) {
-    return next(new ErrorHandler(error.message, 500));
+    // Server/unexpected errors
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'SERVER_ERROR',
+      message: 'An unexpected error occurred. Please try again later.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }));
 

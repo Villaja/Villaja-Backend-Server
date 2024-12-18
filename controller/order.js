@@ -447,7 +447,6 @@ router.put(
           await updateOrder(o._id, o.qty, o.color);
         });
       }
-
       // Store the previous status for comparison
       const previousStatus = order.status;
 
