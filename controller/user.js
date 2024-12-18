@@ -370,8 +370,32 @@ router.post('/login', catchAsyncErrors(async (req, res, next) => {
       expiresIn: '10d',
     });
 
+    // Add this before trying to call sendEmail() in the login route
+    const sendEmail = () => {
+      return new Promise((resolve, reject) => {
+        const mailOptions = {
+          from: 'villajamarketplace@gmail.com',
+          to: user.email,
+          subject: 'You Just Logged In to Villaja',
+          html: `<h3>Hello ${user.firstname},</h3> 
+                 <p>We're verifying a recent sign-in for ${email}</p> 
+                 <p>Timestamp: ${new Date().toLocaleString()}</p> 
+                 <p>If you believe that this sign-in is suspicious, please reset your password immediately.</p> 
+                 <p>Thanks, </br></br> Villaja Team</p>`
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve('Email sent');
+          }
+        });
+      });
+    };
+
     // Send login notification email
-    try {
+    try { 
       await sendEmail();
       console.log('Login notification email sent successfully');
     } catch (emailError) {
