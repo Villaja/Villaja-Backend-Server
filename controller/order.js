@@ -666,10 +666,198 @@ router.put(
         try {
           const seller = await Shop.findById(order.cart[cartIndex].shop._id);
           if (seller) {
-            const productPrice = order.cart[cartIndex].discountPrice == 0 || order.cart[cartIndex].discountPrice === null ? order.cart[cartIndex].originalPrice : order.cart[cartIndex].discountPrice;
-            seller.availableBalance += productPrice;
+            const productPrice = order.cart[cartIndex].discountPrice === 0 || 
+                               order.cart[cartIndex].discountPrice === null ? 
+                               order.cart[cartIndex].originalPrice : 
+                               order.cart[cartIndex].discountPrice;
+                               
+            const totalProductPrice = productPrice * order.cart[cartIndex].qty;
+
+            seller.availableBalance += totalProductPrice;
             await seller.save();
-            console.log(`Seller's balance updated for product ${product.name} - Added ${productPrice}`);
+            console.log(`Seller's balance updated for product ${product.name} - Added ${totalProductPrice}`);
+
+            const sellerMessage = `
+            <html>
+                <body>
+                  <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+                    <h2>Product Approval Received</h2>
+                    <p>
+                     Congratulations! A product ${product.name} ordered by ${order.user.firstname} ${order.user.lastname} has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                    </p>
+                    <p>
+                      You can now withdraw your earnings of ₦${totalProductPrice.toLocaleString()} from your dashboard.
+                    </p>
+                    <p>
+                      Order ID: ${order._id}
+                    </p>
+                    <p>
+                      Product: ${product.name}
+                    </p>
+                    <p>
+                      Price: ₦${totalProductPrice.toLocaleString()}
+                    </p>
+                    <p>
+                      Customer Rating: ${rating}/5
+                    </p>
+                    <p>
+                      Customer Review: "${comment}"
+                    </p>
+                    <p>
+                      Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+                   </p>
+                    <p>
+                      Best regards,</br>
+                      The Villaja Team
+                    </p>
+                  </div>
+                </body>
+              </html>
+            `;
+
+            // user email message    
+            const userMessage = `
+            <html>
+                <body>
+                  <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+                    <h2>Product Approval Given</h2>
+                    <p>
+                      You have successfully ${approvalStatus.toLowerCase()} the product from your order.
+                    </p>
+                    <p>
+                      Order ID: ${order._id}
+                    </p>
+                    <p>
+                      Product: ${product.name}
+                    </p>
+                    <p>
+                      Your Rating: ${rating}/5
+                    </p>
+                    <p>
+                      Your Review: "${comment}"
+                    </p>
+                    <p>
+                      Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+                   </p>
+                    <p>
+                      Best regards,</br>
+                      The Villaja Team
+                    </p>
+                  </div>
+                </body>
+              </html>
+            `;
+
+            // admin email message 
+            const adminMessage = `
+            <html>
+                <body>
+                  <div style="text-align: left; background-color: #f3f3f3; padding: 20px;">
+                    <h2>Product Approval Received</h2>
+                    <p>
+                      A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
+                    </p>
+                    <p>
+                      Order ID: ${order._id}
+                    </p>
+                    <p>
+                      Product: ${product.name}
+                    </p>
+                    <p>
+                      Customer Rating: ${rating}/5
+                    </p>
+                    <p>
+                      Customer Review: "${comment}"
+                    </p>
+                    <p>
+                      Any questions? Contact us: <a href="mailto:villajamarketplace@gmail.com">villajamarketplace@gmail.com</a>
+                   </p>
+                    <p>
+                      Best regards,</br>
+                      The Villaja Team
+                    </p>
+                  </div>
+                </body>
+              </html>
+            `;
+
+            // Send email notification to the user 
+            const sendUserEmail = () => {
+              return new Promise((resolve, reject) => {
+                const mailOptions = {
+                  from: 'villajamarketplace@gmail.com',
+                  to: order.user.email,
+                  subject: subject,
+                  html: userMessage
+                };
+
+                transporter.sendMail(mailOptions, (error, info) => {
+                  if (error) {
+                    reject(error);
+                  } else {
+                    resolve('Email sent');
+                  }
+                });
+              });
+            };
+
+            // Send email notification to the admin
+            const sendAdminEmail = () => {
+              return new Promise((resolve, reject) => {
+                const mailOptions = {
+                  from: 'villajamarketplace@gmail.com',
+                  to: adminEmail,
+                  subject: subject,
+                  html: adminMessage
+                };
+
+                transporter.sendMail(mailOptions, (error, info) => {
+                  if (error) {
+                    reject(error);
+                  } else {
+                    resolve('Email sent');
+                  }
+                });
+              });
+            };
+
+            // Send email notification to the seller
+            const sendSellerEmail = () => {
+              return new Promise((resolve, reject) => {
+                const mailOptions = {
+                  from: 'villajamarketplace@gmail.com',
+                  to: order.cart[cartIndex].shop.email,
+                  subject: subject,
+                  html: sellerMessage
+                };
+
+                transporter.sendMail(mailOptions, (error, info) => {
+                  if (error) {
+                    reject(error);
+                  } else {
+                    resolve('Email sent');
+                  }
+                });
+              });
+            };
+
+            try {
+              await sendUserEmail();
+              await sendAdminEmail();
+              await sendSellerEmail();
+            } catch (error) {
+              console.error('Email sending failed:', error);
+            }
+
+            const userToken = await getToken(userId);
+            if (userToken) {
+              await expo.sendPushNotificationsAsync([{
+                to: userToken.token,
+                title: `Product ${approvalStatus}`,
+                body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order`
+              }]);
+            }
+
           }
         } catch (error) {
           console.error('Error updating seller balance:', error);
@@ -690,7 +878,7 @@ router.put(
                  Congratulations! A product ${product.name} ordered by ${order.user.firstname} ${order.user.lastname} has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}.
                 </p>
                 <p>
-                  You can now withdraw your earnings of ₦${productPrice.toLocaleString()} from your dashboard.
+                  You can now withdraw your earnings of ₦${totalProductPrice.toLocaleString()} from your dashboard.
                 </p>
                 <p>
                   Order ID: ${order._id}
@@ -699,7 +887,7 @@ router.put(
                   Product: ${product.name}
                 </p>
                 <p>
-                  Price: ₦${productPrice.toLocaleString()}
+                  Price: ₦${totalProductPrice.toLocaleString()}
                 </p>
                 <p>
                   Customer Rating: ${rating}/5
@@ -853,15 +1041,29 @@ router.put(
           console.error('Email sending failed:', error);
         }
 
-        const userToken = await getToken(userId);
-        if (userToken) {
-          await expo.sendPushNotificationsAsync([{
-            to: userToken.token,
-            title: `Product ${approvalStatus}`,
-            body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order`
-          }]);
-        }
+        try {
+          const userToken = await getToken(userId);
+          if (userToken && userToken.token) {
+            await expo.sendPushNotificationsAsync([{
+              to: userToken.token,
+              title: `Product ${approvalStatus}`,
+              body: `You have successfully ${approvalStatus.toLowerCase()} the product from your order. An order issue ticket will be raised immediately.`
+            }]);
+          }
 
+          const sellerId = String(order.cart[cartIndex].shop._id);
+          const sellerToken = await getToken(sellerId);
+          if (sellerToken && sellerToken.token) {
+            await expo.sendPushNotificationsAsync([{
+              to: sellerToken.token,
+              title: `Product ${approvalStatus}`,
+              body: `A product has been ${approvalStatus.toLowerCase()} by ${order.user.firstname} ${order.user.lastname}. You have 48 hours to respond.`
+            }]);
+          }
+        } catch (error) {
+          console.error('Push notification error:', error);
+          // Continue execution even if push notification fails
+        }
       } else if (approvalStatus === "Declined") {
         
         // Add review to the product
