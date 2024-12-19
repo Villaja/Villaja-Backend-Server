@@ -458,7 +458,7 @@ router.put(
       if (req.body.status === "Delivered") {
         order.deliveredAt = Date.now();
         order.paymentInfo.status = "Succeeded";
-        
+
         // Start the automation process
         await startOrderAutomation(order._id);
       }
@@ -666,14 +666,18 @@ router.put(
         try {
           const seller = await Shop.findById(order.cart[cartIndex].shop._id);
           if (seller) {
-            const productPrice = order.cart[cartIndex].discountPrice === 0 || 
-                               order.cart[cartIndex].discountPrice === null ? 
-                               order.cart[cartIndex].originalPrice : 
-                               order.cart[cartIndex].discountPrice;
-                               
+            const productPrice = order.cart[cartIndex].discountPrice === 0 ||
+              order.cart[cartIndex].discountPrice === null ?
+              order.cart[cartIndex].originalPrice :
+              order.cart[cartIndex].discountPrice;
+
+              console.log(productPrice);
+
             const totalProductPrice = productPrice * order.cart[cartIndex].qty;
+            console.log(totalProductPrice);
 
             seller.availableBalance += totalProductPrice;
+            console.log(seller.availableBalance);
             await seller.save();
             console.log(`Seller's balance updated for product ${product.name} - Added ${totalProductPrice}`);
 
@@ -1065,7 +1069,7 @@ router.put(
           // Continue execution even if push notification fails
         }
       } else if (approvalStatus === "Declined") {
-        
+
         // Add review to the product
         const review = {
           user: {
@@ -1079,13 +1083,13 @@ router.put(
           productId: product._id,
           createdAt: new Date()
         };
-        
+
         product.reviews.push(review);
         const totalRating = product.reviews.reduce((sum, item) => sum + item.rating, 0);
         product.ratings = totalRating / product.reviews.length;
-        
+
         await product.save();
-        
+
         // Update the product in the order's cart
         order.cart[cartIndex] = {
           ...order.cart[cartIndex],
@@ -1093,7 +1097,7 @@ router.put(
           reviews: product.reviews,
           ratings: rating,
         };
-        
+
         await createOrderIssue(
           orderId,
           order.user._id,
