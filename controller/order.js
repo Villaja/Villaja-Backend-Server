@@ -671,10 +671,10 @@ router.put(
               order.cart[cartIndex].originalPrice :
               order.cart[cartIndex].discountPrice;
 
-              console.log(productPrice);
+              console.log("productPrice", productPrice);
 
-            const totalProductPrice = productPrice * order.cart[cartIndex].qty;
-            console.log(totalProductPrice);
+            const totalProductPrice = productPrice * order.cart[cartIndex].stock;
+            console.log("totalProductPrice", totalProductPrice);
 
             seller.availableBalance += totalProductPrice;
             console.log(seller.availableBalance);
