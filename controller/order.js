@@ -628,11 +628,19 @@ router.put(
         return next(new ErrorHandler("Product not found", 404));
       }
 
+      
+
       // 3. Find the product index in cart using productId
       const cartIndex = order.cart.findIndex(item => item._id.toString() === productId);
       if (cartIndex === -1) {
         return next(new ErrorHandler("Product not found in order", 404));
-      }
+      } 
+
+      // 4. Get necessary data
+      const adminEmail = "villajamarketplace@gmail.com";
+      const userId = String(order.user._id);
+      const userEmail = order.user.email;
+      const subject = `Order Product ${approvalStatus}`;
 
       if (approvalStatus === "Approved") {
         const review = {
@@ -866,11 +874,6 @@ router.put(
         } catch (error) {
           console.error('Error updating seller balance:', error);
         }
-
-        const adminEmail = "villajamarketplace@gmail.com";
-        const userId = String(order.user._id);
-        const userEmail = order.user.email;
-        const subject = `Order Product ${approvalStatus}`;
 
         // seller email message
         const sellerMessage = `
