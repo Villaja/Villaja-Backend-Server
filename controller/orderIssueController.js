@@ -21,8 +21,8 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// Function to create an order issue ticket with individual parameters
-exports.createOrderIssue = async (orderId, customerId, shopId, productId, productPrice, customerEmail, shopEmail, shopName, comment) => {
+// // Function to create an order issue ticket with individual parameters
+const createOrderIssue = async (orderId, customerId, shopId, productId, productPrice, customerEmail, shopEmail, shopName, customerName, comment) => {
     try {
         const orderIssue = new OrderIssue({
             orderId,
@@ -42,7 +42,7 @@ exports.createOrderIssue = async (orderId, customerId, shopId, productId, produc
     } catch (error) {
         console.error('Failed to create order issue ticket:', error);
     }
-}; 
+};
 
 // Update order issue response status
 router.put(
@@ -261,4 +261,8 @@ router.get(
     })
 );
 
-module.exports = router; 
+// Export both the router and the function
+module.exports = {
+    router,
+    createOrderIssue
+}; 

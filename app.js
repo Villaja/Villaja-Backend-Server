@@ -8,6 +8,7 @@ const Product = require('./model/product');
 const createExchangeRateUpdater  = require("price-to-exchange-rate-update");
 const { saveToken } = require('./Firebase');
 
+
 app.use(cors({
   origin: ['*', 'http://localhost:3000', 'https://villaja-frontend.vercel.app', "https://www.villaja.com"],
   credentials: true
@@ -48,6 +49,7 @@ const quickSwap = require('./controller/quickSwap');
 const notFound = require('./controller/notFound');
 const refund = require('./controller/refund')
 const webhook = require('./controller/webhook')
+const orderIssueController = require("./controller/orderIssueController");
 app.use("/api/user", user);
 app.use("/api/shop", shop);
 app.use("/api/conversation", conversation);
@@ -63,6 +65,7 @@ app.use("/api/quick-swap", quickSwap);
 app.use("/api/not-found", notFound);
 app.use("/api/refund", refund);
 app.use("/api/webhook", webhook);
+app.use("/api/order-issue", orderIssueController.router);
 
 const updatePrices = createExchangeRateUpdater({
   fetchProducts: async () => {
