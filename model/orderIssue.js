@@ -24,6 +24,8 @@ const orderIssueSchema = new mongoose.Schema({
         default: "Pending",
     },
     comment: String,
+    shopName: String,
+    customerName: String,
 })
 
 module.exports = mongoose.model("OrderIssue", orderIssueSchema);

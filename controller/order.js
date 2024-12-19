@@ -998,6 +998,8 @@ router.put(
           order.cart[cartIndex].discountPrice || order.cart[cartIndex].originalPrice,
           order.user.email,
           order.cart[cartIndex].shop.email,
+          order.cart[cartIndex].shop.name,
+          order.user.firstname + " " + order.user.lastname,
           comment
         );
 

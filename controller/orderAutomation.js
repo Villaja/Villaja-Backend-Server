@@ -4,6 +4,8 @@ const nodemailer = require('nodemailer');
 const { Expo } = require('expo-server-sdk');
 const { getToken } = require('../Firebase');
 const Shop = require('../model/shop');
+const { promisify } = require('util');
+const sleep = promisify(setTimeout);
 
 const expo = new Expo();
 
@@ -83,31 +85,44 @@ const sendNotificationEmails = async (product, order) => {
 
   try {
     // Send to user
-    await transporter.sendMail({
-      from: 'villajamarketplace@gmail.com',
-      to: order.user.email,
-      subject: 'Order Automatically Approved',
-      html: userEmail,
-    });
-
-    // Send to seller
-    await transporter.sendMail({
-      from: 'villajamarketplace@gmail.com',
-      to: product.shop.email,
-      subject: 'Product Automatically Approved',
-      html: sellerEmail,
-    });
-
-    // Send to admin
-    await transporter.sendMail({
-      from: 'villajamarketplace@gmail.com',
-      to: 'villajamarketplace@gmail.com',
-      subject: 'Product Automatically Approved',
-      html: adminEmail,
-    });
+    await Promise.allSettled([
+      sendEmailWithRetry({
+        from: 'villajamarketplace@gmail.com',
+        to: order.user.email,
+        subject: 'Order Automatically Approved',
+        html: userEmail,
+      }),
+      sendEmailWithRetry({
+        from: 'villajamarketplace@gmail.com',
+        to: product.shop.email,
+        subject: 'Product Automatically Approved',
+        html: sellerEmail,
+      }),
+      sendEmailWithRetry({
+        from: 'villajamarketplace@gmail.com',
+        to: 'villajamarketplace@gmail.com',
+        subject: 'Product Automatically Approved',
+        html: adminEmail,
+      })
+    ]);
   } catch (error) {
     console.error('Error sending emails:', error);
   }
+};
+
+const validateAndCalculatePrice = (product) => {
+  const discountPrice = Number(product.discountPrice);
+  const originalPrice = Number(product.originalPrice);
+  
+  if (isNaN(discountPrice) || isNaN(originalPrice)) {
+    throw new Error('Invalid price values');
+  }
+  
+  if (originalPrice <= 0) {
+    throw new Error('Original price must be greater than 0');
+  }
+  
+  return discountPrice === 0 || discountPrice === null ? originalPrice : discountPrice;
 };
 
 // Function to update seller's available balance
@@ -115,18 +130,24 @@ const updateSellerBalance = async (product) => {
   try {
     const seller = await Shop.findById(product.shopId);
     if (!seller) {
-      console.error(`Seller not found for product ${product.name}`);
-      return;
+      throw new Error(`Seller not found for product ${product.name}`);
     }
 
-    // Use discountPrice if available, otherwise use originalPrice
-    const productPrice = product.discountPrice == 0 || product.discountPrice === null ? product.originalPrice : product.discountPrice;
-    seller.availableBalance += productPrice;
-    await seller.save();
+    const productPrice = validateAndCalculatePrice(product);
+    const currentBalance = Number(seller.availableBalance) || 0;
+    
+    seller.availableBalance = currentBalance + productPrice;
+    
+    await retryOperation(() => seller.save());
     
     console.log(`Seller's balance updated for product ${product.name}; Added ₦${productPrice.toLocaleString()}`);
   } catch (error) {
-    console.error('Error updating seller balance:', error);
+    console.error('Error updating seller balance:', {
+      error: error.message,
+      productId: product._id,
+      sellerId: product.shopId
+    });
+    throw error; // Rethrow to handle in calling function
   }
 };
 
@@ -243,17 +264,80 @@ const checkPendingStatus = async (orderId) => {
   }
 };
 
+const cleanupAutomation = async (orderId) => {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+
+    // Clear any pending schedules
+    const scheduledJobs = schedule.scheduledJobs;
+    Object.keys(scheduledJobs)
+      .filter(key => key.includes(orderId))
+      .forEach(key => scheduledJobs[key].cancel());
+
+    console.log(`Automation cleanup completed for order ${orderId}`);
+  } catch (error) {
+    console.error('Cleanup error:', error);
+  }
+};
+
 // Main function to start automation for a specific order
 const startOrderAutomation = async (orderId) => {
-  // Schedule 2-hour interval checks for 24 hours
-  const twoHourChecks = schedule.scheduleJob(`*/120 * * * *`, async function() {
-    await checkPendingStatus(orderId);
-  });
+  console.log(`Starting automation for order ${orderId}`);
+  
+  const jobKey = `reminder_${orderId}`;
+  const finalJobKey = `final_${orderId}`;
+  
+  try {
+    // Schedule 2-hour interval checks
+    const twoHourChecks = schedule.scheduleJob(jobKey, '*/120 * * * *', async () => {
+      await retryOperation(() => checkPendingStatus(orderId));
+    });
 
-  // Schedule final check and update after 24 hours
-  const finalCheck = schedule.scheduleJob(new Date(Date.now() + 24 * 60 * 60 * 1000), async function() {
-    await checkAndUpdatePendingApprovals();
-    twoHourChecks.cancel(); // Cancel the 2-hour interval checks
+    // Schedule final check
+    const finalCheck = schedule.scheduleJob(finalJobKey, new Date(Date.now() + 24 * 60 * 60 * 1000), async () => {
+      await retryOperation(() => checkAndUpdatePendingApprovals());
+      await cleanupAutomation(orderId);
+    });
+
+    // Add error handlers
+    twoHourChecks.on('error', (error) => {
+      console.error(`Reminder job error for ${orderId}:`, error);
+    });
+
+    finalCheck.on('error', (error) => {
+      console.error(`Final check error for ${orderId}:`, error);
+    });
+  } catch (error) {
+    console.error(`Failed to start automation for order ${orderId}:`, error);
+    await cleanupAutomation(orderId);
+  }
+};
+
+const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error);
+      if (attempt < maxRetries) {
+        await sleep(delay * attempt);
+      }
+    }
+  }
+  throw lastError;
+};
+
+const sendEmailWithRetry = async (mailOptions) => {
+  if (!mailOptions.to || !mailOptions.subject || !mailOptions.html) {
+    throw new Error('Invalid email parameters');
+  }
+
+  return retryOperation(async () => {
+    return await transporter.sendMail(mailOptions);
   });
 };
 
